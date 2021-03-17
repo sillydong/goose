@@ -491,7 +491,6 @@ func (m TiDBDialect) lock(db *sql.DB) error {
 		}
 
 		if success {
-			log.Println("get lock")
 			m.isLocked = true
 			return nil
 		}
