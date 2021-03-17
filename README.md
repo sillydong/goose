@@ -1,5 +1,9 @@
 # goose
 
+**Changelog:**
+- Add lock to lock table while running migrations. With lock, we can run multiple replications in K8S. Locks are from https://github.com/golang-migrate/migrate
+- Force use transaction to run all migrations. We believe all migrations should run successfully or nothing changed if errors happen.
+
 Goose is a database migration tool. Manage your database schema by creating incremental SQL changes or Go functions.
 
 [![GoDoc Widget]][GoDoc] [![Travis Widget]][Travis]
