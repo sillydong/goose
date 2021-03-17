@@ -6,7 +6,7 @@ import (
 
 // Redo rolls back the most recently applied migration, then runs it again.
 func Redo(db *sql.DB, dir string) error {
-	if err := GetDialect().lock(db);err!=nil{
+	if err := GetDialect().lock(db); err != nil {
 		return err
 	}
 	defer GetDialect().unlock(db)

@@ -11,8 +11,8 @@ func UpTo(db *sql.DB, dir string, version int64) error {
 		return err
 	}
 
-	loop := func()error{
-		if err := GetDialect().lock(db);err!=nil{
+	loop := func() error {
+		if err := GetDialect().lock(db); err != nil {
 			return err
 		}
 		defer GetDialect().unlock(db)
@@ -38,7 +38,7 @@ func UpTo(db *sql.DB, dir string, version int64) error {
 	}
 
 	for {
-		if err := loop();err!=nil{
+		if err := loop(); err != nil {
 			if err == ErrNoNextVersion {
 				return nil
 			}
@@ -59,7 +59,7 @@ func UpByOne(db *sql.DB, dir string) error {
 		return err
 	}
 
-	if err:=GetDialect().lock(db);err!=nil{
+	if err := GetDialect().lock(db); err != nil {
 		return err
 	}
 	defer GetDialect().unlock(db)

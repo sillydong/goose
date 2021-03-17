@@ -13,6 +13,7 @@ var (
 	maxVersion      = int64((1 << 63) - 1)
 	timestampFormat = "20060102150405"
 	verbose         = false
+	maxRetry        = 3
 )
 
 // SetVerbose set the goose verbosity mode

@@ -7,7 +7,7 @@ import (
 
 // Down rolls back a single migration from the current version.
 func Down(db *sql.DB, dir string) error {
-	if err := GetDialect().lock(db);err!=nil{
+	if err := GetDialect().lock(db); err != nil {
 		return err
 	}
 	defer GetDialect().unlock(db)
@@ -37,8 +37,8 @@ func DownTo(db *sql.DB, dir string, version int64) error {
 		return err
 	}
 
-	loop := func()error{
-		if err := GetDialect().lock(db);err != nil{
+	loop := func() error {
+		if err := GetDialect().lock(db); err != nil {
 			return err
 		}
 		defer GetDialect().unlock(db)
@@ -67,8 +67,8 @@ func DownTo(db *sql.DB, dir string, version int64) error {
 	}
 
 	for {
-		if err := loop();err!=nil{
-			if err == ErrNoNextVersion || err == ErrNoCurrentVersion{
+		if err := loop(); err != nil {
+			if err == ErrNoNextVersion || err == ErrNoCurrentVersion {
 				return nil
 			}
 			return err
