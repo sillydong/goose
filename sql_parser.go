@@ -70,6 +70,12 @@ func parseSQLMigration(r io.Reader, direction bool) (stmts []string, useTx bool,
 			log.Println(line)
 		}
 
+		// Ignore empty lines.
+		if matchEmptyLines.MatchString(line) {
+			verboseInfo("StateMachine: ignore empty line")
+			continue
+		}
+
 		if strings.HasPrefix(line, "--") {
 			cmd := strings.TrimSpace(strings.TrimPrefix(line, "--"))
 
@@ -112,6 +118,7 @@ func parseSQLMigration(r io.Reader, direction bool) (stmts []string, useTx bool,
 				default:
 					return nil, false, errors.New("'-- +goose StatementEnd' must be defined after '-- +goose StatementBegin', see https://github.com/sillydong/goose#sql-migrations")
 				}
+				continue
 
 			case "+goose NO TRANSACTION":
 				useTx = false
@@ -122,12 +129,6 @@ func parseSQLMigration(r io.Reader, direction bool) (stmts []string, useTx bool,
 				verboseInfo("StateMachine: ignore comment")
 				continue
 			}
-		}
-
-		// Ignore empty lines.
-		if matchEmptyLines.MatchString(line) {
-			verboseInfo("StateMachine: ignore empty line")
-			continue
 		}
 
 		// Write SQL line to a buffer.
