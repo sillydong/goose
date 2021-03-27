@@ -10,7 +10,7 @@ Goose is a database migration tool. Manage your database schema by creating incr
 
 ### Goals of this fork
 
-`github.com/pressly/goose` is a fork of `bitbucket.org/liamstask/goose` with the following changes:
+`github.com/sillydong/goose` is a fork of `bitbucket.org/liamstask/goose` with the following changes:
 - No config files
 - [Default goose binary](./cmd/goose/main.go) can migrate SQL files only
 - Go migrations:
@@ -30,7 +30,7 @@ Goose is a database migration tool. Manage your database schema by creating incr
 
 # Install
 
-    $ go get -u github.com/pressly/goose/cmd/goose
+    $ go get -u github.com/sillydong/goose/cmd/goose
 
 This will install the `goose` binary to your `$GOPATH/bin` directory.
 
@@ -227,7 +227,7 @@ language plpgsql;
 ## Go Migrations
 
 1. Create your own goose binary, see [example](./examples/go-migrations)
-2. Import `github.com/pressly/goose`
+2. Import `github.com/sillydong/goose`
 3. Register your migration functions
 4. Run goose command, ie. `goose.Up(db *sql.DB, dir string)`
 
@@ -239,7 +239,7 @@ package migrations
 import (
 	"database/sql"
 
-	"github.com/pressly/goose"
+	"github.com/sillydong/goose"
 )
 
 func init() {
@@ -264,7 +264,7 @@ func Down(tx *sql.Tx) error {
 ```
 
 # Hybrid Versioning
-Please, read the [versioning problem](https://github.com/pressly/goose/issues/63#issuecomment-428681694) first.
+Please, read the [versioning problem](https://github.com/sillydong/goose/issues/63#issuecomment-428681694) first.
 
 We strongly recommend adopting a hybrid versioning approach, using both timestamps and sequential numbers. Migrations created during the development process are timestamped and sequential versions are ran on production. We believe this method will prevent the problem of conflicting versions when writing software in a team environment.
 
@@ -274,7 +274,7 @@ To help you adopt this approach, `create` will use the current timestamp as the 
 
 Licensed under [MIT License](./LICENSE)
 
-[GoDoc]: https://godoc.org/github.com/pressly/goose
-[GoDoc Widget]: https://godoc.org/github.com/pressly/goose?status.svg
-[Travis]: https://travis-ci.org/pressly/goose
-[Travis Widget]: https://travis-ci.org/pressly/goose.svg?branch=master
+[GoDoc]: https://godoc.org/github.com/sillydong/goose
+[GoDoc Widget]: https://godoc.org/github.com/sillydong/goose?status.svg
+[Travis]: https://travis-ci.org/sillydong/goose
+[Travis Widget]: https://travis-ci.org/sillydong/goose.svg?branch=master
