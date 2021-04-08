@@ -187,7 +187,7 @@ func (m MySQLDialect) lock(db *sql.DB) error {
 		if retryCount > maxRetry {
 			return fmt.Errorf("fail get lock after %d retries", retryCount)
 		}
-		query := "SELECT GET_LOCK(?, 10)"
+		query := "SELECT GET_LOCK(?, 30)"
 		var success bool
 		if err := db.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
 			return fmt.Errorf("try lock failed, err: %s", err.Error())
@@ -484,7 +484,7 @@ func (m TiDBDialect) lock(db *sql.DB) error {
 		if retryCount > maxRetry {
 			return fmt.Errorf("fail get lock after %d retries", retryCount)
 		}
-		query := "SELECT GET_LOCK(?, 10)"
+		query := "SELECT GET_LOCK(?, 30)"
 		var success bool
 		if err := db.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
 			return fmt.Errorf("try lock failed, err: %s", err.Error())
