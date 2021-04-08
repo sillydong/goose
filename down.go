@@ -3,14 +3,20 @@ package goose
 import (
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 // Down rolls back a single migration from the current version.
 func Down(db *sql.DB, dir string) error {
+	log.Printf("goose: try lock %d", time.Now())
 	if err := GetDialect().lock(db); err != nil {
 		return err
 	}
-	defer GetDialect().unlock(db)
+	log.Printf("goose: get lock %d", time.Now())
+	defer func() {
+		log.Printf("goose: release lock %d", time.Now())
+		_ = GetDialect().unlock(db)
+	}()
 
 	currentVersion, err := GetDBVersion(db)
 	if err != nil {
@@ -38,10 +44,15 @@ func DownTo(db *sql.DB, dir string, version int64) error {
 	}
 
 	loop := func() error {
+		log.Printf("goose: try lock %d", time.Now())
 		if err := GetDialect().lock(db); err != nil {
 			return err
 		}
-		defer GetDialect().unlock(db)
+		log.Printf("goose: get lock %d", time.Now())
+		defer func() {
+			log.Printf("goose: release lock %d", time.Now())
+			_ = GetDialect().unlock(db)
+		}()
 
 		currentVersion, err := GetDBVersion(db)
 		if err != nil {

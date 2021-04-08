@@ -185,7 +185,7 @@ func (m MySQLDialect) lock(db *sql.DB) error {
 	retryCount := 0
 	for {
 		if retryCount > maxRetry {
-			return fmt.Errorf("fail get lock after %d retries", retryCount)
+			return fmt.Errorf("fail get lock after %d retries", maxRetry)
 		}
 		query := "SELECT GET_LOCK(?, 30)"
 		var success bool

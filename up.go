@@ -2,6 +2,7 @@ package goose
 
 import (
 	"database/sql"
+	"time"
 )
 
 // UpTo migrates up to a specific version.
@@ -12,10 +13,15 @@ func UpTo(db *sql.DB, dir string, version int64) error {
 	}
 
 	loop := func() error {
+		log.Printf("goose: try lock %d", time.Now())
 		if err := GetDialect().lock(db); err != nil {
 			return err
 		}
-		defer GetDialect().unlock(db)
+		log.Printf("goose: get lock %d", time.Now())
+		defer func() {
+			log.Printf("goose: release lock %d", time.Now())
+			_ = GetDialect().unlock(db)
+		}()
 
 		current, err := GetDBVersion(db)
 		if err != nil {
@@ -59,10 +65,15 @@ func UpByOne(db *sql.DB, dir string) error {
 		return err
 	}
 
+	log.Printf("goose: try lock %d", time.Now())
 	if err := GetDialect().lock(db); err != nil {
 		return err
 	}
-	defer GetDialect().unlock(db)
+	log.Printf("goose: get lock %d", time.Now())
+	defer func() {
+		log.Printf("goose: release lock %d", time.Now())
+		_ = GetDialect().unlock(db)
+	}()
 
 	currentVersion, err := GetDBVersion(db)
 	if err != nil {
