@@ -181,6 +181,8 @@ func (m MySQLDialect) lock(db *sql.Tx) error {
 		return err
 	}
 
+	log.Printf("goose: lock lockid: %v", aid)
+
 	// keep trying if get_lock timeout
 	retryCount := 0
 	for {
@@ -199,6 +201,7 @@ func (m MySQLDialect) lock(db *sql.Tx) error {
 		}
 
 		retryCount++
+		log.Println("goose: lock needs retry")
 	}
 }
 
@@ -212,17 +215,31 @@ func (m MySQLDialect) unlock(db *sql.Tx) error {
 		return err
 	}
 
-	query := `SELECT RELEASE_LOCK(?)`
-	if _, err := db.ExecContext(context.Background(), query, aid); err != nil {
-		return fmt.Errorf("try unlock failed, err: %s", err.Error())
+	log.Printf("goose: unlock lockid: %v", aid)
+
+	retryCount := 0
+	for {
+		if retryCount > maxRetry {
+			return fmt.Errorf("fail unlock after %d retries", maxRetry)
+		}
+		query := `SELECT RELEASE_LOCK(?)`
+		var success bool
+		if err := db.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
+			return fmt.Errorf("try unlock failed, err: %s", err.Error())
+		}
+
+		// NOTE: RELEASE_LOCK could return NULL or (or 0 if the code is changed),
+		// in which case isLocked should be true until the timeout expires -- synchronizing
+		// these states is likely not worth trying to do; reconsider the necessity of isLocked.
+
+		if success {
+			m.isLocked = false
+			return nil
+		}
+
+		retryCount++
+		log.Println("goose: unlock needs retry")
 	}
-
-	// NOTE: RELEASE_LOCK could return NULL or (or 0 if the code is changed),
-	// in which case isLocked should be true until the timeout expires -- synchronizing
-	// these states is likely not worth trying to do; reconsider the necessity of isLocked.
-
-	m.isLocked = false
-	return nil
 }
 
 ////////////////////////////

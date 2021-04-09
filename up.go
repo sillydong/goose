@@ -44,9 +44,11 @@ func UpTo(db *sql.DB, dir string, version int64) error {
 	log.Printf("goose: got lock %d", time.Now().Unix())
 	defer func() {
 		log.Printf("goose: release lock %d", time.Now().Unix())
-		_ = GetDialect().unlock(tx)
-		if err := tx.Commit(); err != nil {
+		if err := GetDialect().unlock(tx); err != nil {
 			log.Printf("goose: release lock error: %v", err)
+		}
+		if err := tx.Commit(); err != nil {
+			log.Printf("goose: release lock tx commit error: %v", err)
 		}
 	}()
 
@@ -83,9 +85,11 @@ func UpByOne(db *sql.DB, dir string) error {
 	log.Printf("goose: got lock %d", time.Now().Unix())
 	defer func() {
 		log.Printf("goose: release lock %d", time.Now().Unix())
-		_ = GetDialect().unlock(tx)
-		if err := tx.Commit(); err != nil {
+		if err := GetDialect().unlock(tx); err != nil {
 			log.Printf("goose: release lock error: %v", err)
+		}
+		if err := tx.Commit(); err != nil {
+			log.Printf("goose: release lock tx commit error: %v", err)
 		}
 	}()
 
