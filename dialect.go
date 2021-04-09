@@ -18,8 +18,8 @@ type SQLDialect interface {
 	deleteVersionSQL() string      // sql string to delete version
 	migrationSQL() string          // sql string to retrieve migrations
 	dbVersionQuery(db *sql.DB) (*sql.Rows, error)
-	lock(db *sql.DB) error
-	unlock(db *sql.DB) error
+	lock(db *sql.Tx) error
+	unlock(db *sql.Tx) error
 }
 
 var dialect SQLDialect = &PostgresDialect{}
@@ -93,7 +93,7 @@ func (pg PostgresDialect) deleteVersionSQL() string {
 	return fmt.Sprintf("DELETE FROM %s WHERE version_id=$1;", TableName())
 }
 
-func (pg PostgresDialect) lock(db *sql.DB) error {
+func (pg PostgresDialect) lock(db *sql.Tx) error {
 	if pg.isLocked {
 		return errors.New(TableName() + " is locked")
 	}
@@ -113,7 +113,7 @@ func (pg PostgresDialect) lock(db *sql.DB) error {
 	return nil
 }
 
-func (pg PostgresDialect) unlock(db *sql.DB) error {
+func (pg PostgresDialect) unlock(db *sql.Tx) error {
 	if !pg.isLocked {
 		return nil
 	}
@@ -171,7 +171,7 @@ func (m MySQLDialect) deleteVersionSQL() string {
 	return fmt.Sprintf("DELETE FROM %s WHERE version_id=?;", TableName())
 }
 
-func (m MySQLDialect) lock(db *sql.DB) error {
+func (m MySQLDialect) lock(db *sql.Tx) error {
 	if m.isLocked {
 		return errors.New(TableName() + " is locked")
 	}
@@ -202,7 +202,7 @@ func (m MySQLDialect) lock(db *sql.DB) error {
 	}
 }
 
-func (m MySQLDialect) unlock(db *sql.DB) error {
+func (m MySQLDialect) unlock(db *sql.Tx) error {
 	if !m.isLocked {
 		return nil
 	}
@@ -284,7 +284,7 @@ func (m SqlServerDialect) deleteVersionSQL() string {
 	return fmt.Sprintf("DELETE FROM %s WHERE version_id=@p1;", TableName())
 }
 
-func (m SqlServerDialect) lock(db *sql.DB) error {
+func (m SqlServerDialect) lock(db *sql.Tx) error {
 	if m.isLocked {
 		return errors.New(TableName() + " is locked")
 	}
@@ -317,7 +317,7 @@ func (m SqlServerDialect) lock(db *sql.DB) error {
 	}
 }
 
-func (m SqlServerDialect) unlock(db *sql.DB) error {
+func (m SqlServerDialect) unlock(db *sql.Tx) error {
 	if !m.isLocked {
 		return nil
 	}
@@ -374,11 +374,11 @@ func (m Sqlite3Dialect) deleteVersionSQL() string {
 	return fmt.Sprintf("DELETE FROM %s WHERE version_id=?;", TableName())
 }
 
-func (m Sqlite3Dialect) lock(db *sql.DB) error {
+func (m Sqlite3Dialect) lock(db *sql.Tx) error {
 	return nil
 }
 
-func (m Sqlite3Dialect) unlock(db *sql.DB) error {
+func (m Sqlite3Dialect) unlock(db *sql.Tx) error {
 	return nil
 }
 
@@ -420,11 +420,11 @@ func (rs RedshiftDialect) deleteVersionSQL() string {
 	return fmt.Sprintf("DELETE FROM %s WHERE version_id=$1;", TableName())
 }
 
-func (rs RedshiftDialect) lock(db *sql.DB) error {
+func (rs RedshiftDialect) lock(db *sql.Tx) error {
 	return nil
 }
 
-func (rs RedshiftDialect) unlock(db *sql.DB) error {
+func (rs RedshiftDialect) unlock(db *sql.Tx) error {
 	return nil
 }
 
@@ -468,7 +468,7 @@ func (m TiDBDialect) deleteVersionSQL() string {
 	return fmt.Sprintf("DELETE FROM %s WHERE version_id=?;", TableName())
 }
 
-func (m TiDBDialect) lock(db *sql.DB) error {
+func (m TiDBDialect) lock(db *sql.Tx) error {
 	if m.isLocked {
 		return errors.New(TableName() + " is locked")
 	}
@@ -499,7 +499,7 @@ func (m TiDBDialect) lock(db *sql.DB) error {
 	}
 }
 
-func (m TiDBDialect) unlock(db *sql.DB) error {
+func (m TiDBDialect) unlock(db *sql.Tx) error {
 	if !m.isLocked {
 		return nil
 	}
@@ -560,10 +560,10 @@ func (m ClickHouseDialect) deleteVersionSQL() string {
 	return fmt.Sprintf("ALTER TABLE %s DELETE WHERE version_id = ?", TableName())
 }
 
-func (m ClickHouseDialect) lock(db *sql.DB) error {
+func (m ClickHouseDialect) lock(db *sql.Tx) error {
 	return nil
 }
 
-func (m ClickHouseDialect) unlock(db *sql.DB) error {
+func (m ClickHouseDialect) unlock(db *sql.Tx) error {
 	return nil
 }

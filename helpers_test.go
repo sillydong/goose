@@ -1,6 +1,7 @@
 package goose
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -24,4 +25,9 @@ func TestCamelSnake(t *testing.T) {
 			t.Errorf("unexpected snake_case for input(%q), got %q, want %q", test.in, got, test.snake)
 		}
 	}
+}
+
+func TestLockId(t *testing.T) {
+	schemaname := "pacman_goose_db_version"
+	fmt.Println(generateAdvisoryLockId(schemaname))
 }

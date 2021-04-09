@@ -8,14 +8,21 @@ import (
 
 // Down rolls back a single migration from the current version.
 func Down(db *sql.DB, dir string) error {
-	log.Printf("goose: try lock %d", time.Now())
-	if err := GetDialect().lock(db); err != nil {
+	log.Printf("goose: try lock %d", time.Now().Unix())
+	tx, err := db.Begin()
+	if err != nil {
 		return err
 	}
-	log.Printf("goose: get lock %d", time.Now())
+	if err := GetDialect().lock(tx); err != nil {
+		return err
+	}
+	log.Printf("goose: got lock %d", time.Now().Unix())
 	defer func() {
-		log.Printf("goose: release lock %d", time.Now())
-		_ = GetDialect().unlock(db)
+		log.Printf("goose: release lock %d", time.Now().Unix())
+		_ = GetDialect().unlock(tx)
+		if err := tx.Commit(); err != nil {
+			log.Printf("goose: release lock error: %v", err)
+		}
 	}()
 
 	currentVersion, err := GetDBVersion(db)
@@ -44,16 +51,6 @@ func DownTo(db *sql.DB, dir string, version int64) error {
 	}
 
 	loop := func() error {
-		log.Printf("goose: try lock %d", time.Now())
-		if err := GetDialect().lock(db); err != nil {
-			return err
-		}
-		log.Printf("goose: get lock %d", time.Now())
-		defer func() {
-			log.Printf("goose: release lock %d", time.Now())
-			_ = GetDialect().unlock(db)
-		}()
-
 		currentVersion, err := GetDBVersion(db)
 		if err != nil {
 			return err
@@ -76,6 +73,23 @@ func DownTo(db *sql.DB, dir string, version int64) error {
 
 		return nil
 	}
+
+	log.Printf("goose: try lock %d", time.Now().Unix())
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	if err := GetDialect().lock(tx); err != nil {
+		return err
+	}
+	log.Printf("goose: got lock %d", time.Now().Unix())
+	defer func() {
+		log.Printf("goose: release lock %d", time.Now().Unix())
+		_ = GetDialect().unlock(tx)
+		if err := tx.Commit(); err != nil {
+			log.Printf("goose: release lock error: %v", err)
+		}
+	}()
 
 	for {
 		if err := loop(); err != nil {
