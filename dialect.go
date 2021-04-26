@@ -58,9 +58,7 @@ func SetDialect(d string) error {
 ////////////////////////////
 
 // PostgresDialect struct.
-type PostgresDialect struct {
-	isLocked bool
-}
+type PostgresDialect struct{}
 
 func (pg PostgresDialect) createVersionTableSQL() string {
 	return fmt.Sprintf(`CREATE TABLE %s (
@@ -94,10 +92,6 @@ func (pg PostgresDialect) deleteVersionSQL() string {
 }
 
 func (pg PostgresDialect) lock(db *sql.Tx) error {
-	if pg.isLocked {
-		return errors.New(TableName() + " is locked")
-	}
-
 	aid, err := generateAdvisoryLockId(TableName())
 	if err != nil {
 		return err
@@ -109,15 +103,10 @@ func (pg PostgresDialect) lock(db *sql.Tx) error {
 		return fmt.Errorf("try lock failed, err: %s", err.Error())
 	}
 
-	pg.isLocked = true
 	return nil
 }
 
 func (pg PostgresDialect) unlock(db *sql.Tx) error {
-	if !pg.isLocked {
-		return nil
-	}
-
 	aid, err := generateAdvisoryLockId(TableName())
 	if err != nil {
 		return err
@@ -127,7 +116,6 @@ func (pg PostgresDialect) unlock(db *sql.Tx) error {
 	if _, err := db.ExecContext(context.Background(), query, aid); err != nil {
 		return fmt.Errorf("try unlock failed, err: %s", err.Error())
 	}
-	pg.isLocked = false
 	return nil
 }
 
@@ -136,9 +124,7 @@ func (pg PostgresDialect) unlock(db *sql.Tx) error {
 ////////////////////////////
 
 // MySQLDialect struct.
-type MySQLDialect struct {
-	isLocked bool
-}
+type MySQLDialect struct{}
 
 func (m MySQLDialect) createVersionTableSQL() string {
 	return fmt.Sprintf(`CREATE TABLE %s (
@@ -172,10 +158,6 @@ func (m MySQLDialect) deleteVersionSQL() string {
 }
 
 func (m MySQLDialect) lock(db *sql.Tx) error {
-	if m.isLocked {
-		return errors.New(TableName() + " is locked")
-	}
-
 	aid, err := generateAdvisoryLockId(TableName())
 	if err != nil {
 		return err
@@ -196,7 +178,6 @@ func (m MySQLDialect) lock(db *sql.Tx) error {
 		}
 
 		if success {
-			m.isLocked = true
 			return nil
 		}
 
@@ -206,10 +187,6 @@ func (m MySQLDialect) lock(db *sql.Tx) error {
 }
 
 func (m MySQLDialect) unlock(db *sql.Tx) error {
-	if !m.isLocked {
-		return nil
-	}
-
 	aid, err := generateAdvisoryLockId(TableName())
 	if err != nil {
 		return err
@@ -217,29 +194,12 @@ func (m MySQLDialect) unlock(db *sql.Tx) error {
 
 	log.Printf("goose: unlock lockid: %v", aid)
 
-	retryCount := 0
-	for {
-		if retryCount > maxRetry {
-			return fmt.Errorf("fail unlock after %d retries", maxRetry)
-		}
-		query := `SELECT RELEASE_LOCK(?)`
-		var success bool
-		if err := db.QueryRowContext(context.Background(), query, aid).Scan(&success); err != nil {
-			return fmt.Errorf("try unlock failed, err: %s", err.Error())
-		}
-
-		// NOTE: RELEASE_LOCK could return NULL or (or 0 if the code is changed),
-		// in which case isLocked should be true until the timeout expires -- synchronizing
-		// these states is likely not worth trying to do; reconsider the necessity of isLocked.
-
-		if success {
-			m.isLocked = false
-			return nil
-		}
-
-		retryCount++
-		log.Println("goose: unlock needs retry")
+	query := `SELECT RELEASE_LOCK(?)`
+	if _, err := db.ExecContext(context.Background(), query, aid); err != nil {
+		return fmt.Errorf("try unlock failed, err: %s", err.Error())
 	}
+
+	return nil
 }
 
 ////////////////////////////
@@ -486,10 +446,6 @@ func (m TiDBDialect) deleteVersionSQL() string {
 }
 
 func (m TiDBDialect) lock(db *sql.Tx) error {
-	if m.isLocked {
-		return errors.New(TableName() + " is locked")
-	}
-
 	aid, err := generateAdvisoryLockId(TableName())
 	if err != nil {
 		return err
@@ -508,7 +464,6 @@ func (m TiDBDialect) lock(db *sql.Tx) error {
 		}
 
 		if success {
-			m.isLocked = true
 			return nil
 		}
 
@@ -517,25 +472,17 @@ func (m TiDBDialect) lock(db *sql.Tx) error {
 }
 
 func (m TiDBDialect) unlock(db *sql.Tx) error {
-	if !m.isLocked {
-		return nil
-	}
-
 	aid, err := generateAdvisoryLockId(TableName())
 	if err != nil {
 		return err
 	}
 
+	log.Printf("goose: unlock lockid: %v", aid)
+
 	query := `SELECT RELEASE_LOCK(?)`
 	if _, err := db.ExecContext(context.Background(), query, aid); err != nil {
 		return fmt.Errorf("try unlock failed, err: %s", err.Error())
 	}
-
-	// NOTE: RELEASE_LOCK could return NULL or (or 0 if the code is changed),
-	// in which case isLocked should be true until the timeout expires -- synchronizing
-	// these states is likely not worth trying to do; reconsider the necessity of isLocked.
-
-	m.isLocked = false
 	return nil
 }
 
