@@ -36,7 +36,7 @@ This will install the `goose` binary to your `$GOPATH/bin` directory.
 
 For a lite version of the binary without DB connection dependent commands, use the exclusive build tags:
 
-    $ go build -tags='no_postgres no_mysql no_sqlite3' -i -o goose ./cmd/goose
+    $ go build -tags='no_postgres no_mysql' -i -o goose ./cmd/goose
 
 
 # Usage
@@ -47,22 +47,11 @@ Usage: goose [OPTIONS] DRIVER DBSTRING COMMAND
 Drivers:
     postgres
     mysql
-    sqlite3
-    mssql
-    redshift
 
 Examples:
-    goose sqlite3 ./foo.db status
-    goose sqlite3 ./foo.db create init sql
-    goose sqlite3 ./foo.db create add_some_column sql
-    goose sqlite3 ./foo.db create fetch_user_data go
-    goose sqlite3 ./foo.db up
-
     goose postgres "user=postgres dbname=postgres sslmode=disable" status
     goose mysql "user:password@/dbname?parseTime=true" status
-    goose redshift "postgres://user:password@qwerty.us-east-1.redshift.amazonaws.com:5439/db" status
     goose tidb "user:password@/dbname?parseTime=true" status
-    goose mssql "sqlserver://user:password@dbname:1433?database=master" status
 
 Options:
 

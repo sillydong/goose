@@ -13,16 +13,12 @@ func OpenDBWithDriver(driver string, dbstring string) (*sql.DB, error) {
 	}
 
 	switch driver {
-	case "mssql":
-		driver = "sqlserver"
-	case "redshift":
-		driver = "postgres"
 	case "tidb":
 		driver = "mysql"
 	}
 
 	switch driver {
-	case "postgres", "sqlite3", "mysql", "sqlserver", "clickhouse":
+	case "postgres", "mysql":
 		return sql.Open(driver, dbstring)
 	default:
 		return nil, fmt.Errorf("unsupported driver %s", driver)

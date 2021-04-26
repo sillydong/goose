@@ -4,10 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-
-	mssql "github.com/denisenkom/go-mssqldb"
-
-	"github.com/pkg/errors"
 )
 
 // SQLDialect abstracts the details of specific SQL dialects
@@ -36,16 +32,8 @@ func SetDialect(d string) error {
 		dialect = &PostgresDialect{}
 	case "mysql":
 		dialect = &MySQLDialect{}
-	case "sqlite3":
-		dialect = &Sqlite3Dialect{}
-	case "mssql":
-		dialect = &SqlServerDialect{}
-	case "redshift":
-		dialect = &RedshiftDialect{}
 	case "tidb":
 		dialect = &TiDBDialect{}
-	case "clickhouse":
-		dialect = &ClickHouseDialect{}
 	default:
 		return fmt.Errorf("%q: unknown dialect", d)
 	}
@@ -203,209 +191,6 @@ func (m MySQLDialect) unlock(db *sql.Tx) error {
 }
 
 ////////////////////////////
-// MSSQL
-////////////////////////////
-
-// SqlServerDialect struct.
-type SqlServerDialect struct {
-	isLocked bool
-}
-
-var lockErrorMap = map[mssql.ReturnStatus]string{
-	-1:   "The lock request timed out.",
-	-2:   "The lock request was canceled.",
-	-3:   "The lock request was chosen as a deadlock victim.",
-	-999: "Parameter validation or other call error.",
-}
-
-func (m SqlServerDialect) createVersionTableSQL() string {
-	return fmt.Sprintf(`CREATE TABLE %s (
-                id INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
-                version_id BIGINT NOT NULL,
-                is_applied BIT NOT NULL,
-                tstamp DATETIME NULL DEFAULT CURRENT_TIMESTAMP
-            );`, TableName())
-}
-
-func (m SqlServerDialect) insertVersionSQL() string {
-	return fmt.Sprintf("INSERT INTO %s (version_id, is_applied) VALUES (@p1, @p2);", TableName())
-}
-
-func (m SqlServerDialect) dbVersionQuery(db *sql.DB) (*sql.Rows, error) {
-	rows, err := db.Query(fmt.Sprintf("SELECT version_id, is_applied FROM %s ORDER BY id DESC", TableName()))
-	if err != nil {
-		return nil, err
-	}
-
-	return rows, err
-}
-
-func (m SqlServerDialect) migrationSQL() string {
-	const tpl = `
-WITH Migrations AS
-(
-    SELECT tstamp, is_applied,
-    ROW_NUMBER() OVER (ORDER BY tstamp) AS 'RowNumber'
-    FROM %s
-	WHERE version_id=@p1
-)
-SELECT tstamp, is_applied
-FROM Migrations
-WHERE RowNumber BETWEEN 1 AND 2
-ORDER BY tstamp DESC
-`
-	return fmt.Sprintf(tpl, TableName())
-}
-
-func (m SqlServerDialect) deleteVersionSQL() string {
-	return fmt.Sprintf("DELETE FROM %s WHERE version_id=@p1;", TableName())
-}
-
-func (m SqlServerDialect) lock(db *sql.Tx) error {
-	if m.isLocked {
-		return errors.New(TableName() + " is locked")
-	}
-
-	aid, err := generateAdvisoryLockId(TableName())
-	if err != nil {
-		return err
-	}
-
-	retryCount := 0
-	for {
-		if retryCount > maxRetry {
-			return fmt.Errorf("fail get lock after %d retries", retryCount)
-		}
-		// This will either obtain the lock immediately and return true,
-		// or return false if the lock cannot be acquired immediately.
-		// MS Docs: sp_getapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql?view=sql-server-2017
-		query := `EXEC sp_getapplock @Resource = @p1, @LockMode = 'Update', @LockOwner = 'Session', @LockTimeout = 0`
-
-		var status mssql.ReturnStatus
-		if _, err = db.ExecContext(context.Background(), query, aid, &status); err == nil && status > -1 {
-			m.isLocked = true
-			return nil
-		} else if err != nil {
-			return fmt.Errorf("try lock failed, err: %s", err.Error())
-		} else if status != -1 { // keep trying if timeout
-			return fmt.Errorf("try lock failed, err: %s", lockErrorMap[status])
-		}
-		retryCount++
-	}
-}
-
-func (m SqlServerDialect) unlock(db *sql.Tx) error {
-	if !m.isLocked {
-		return nil
-	}
-
-	aid, err := generateAdvisoryLockId(TableName())
-	if err != nil {
-		return err
-	}
-
-	// MS Docs: sp_releaseapplock: https://docs.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-releaseapplock-transact-sql?view=sql-server-2017
-	query := `EXEC sp_releaseapplock @Resource = @p1, @LockOwner = 'Session'`
-	if _, err := db.ExecContext(context.Background(), query, aid); err != nil {
-		return fmt.Errorf("try unlock failed, err: %s", err.Error())
-	}
-	m.isLocked = false
-
-	return nil
-}
-
-////////////////////////////
-// sqlite3
-////////////////////////////
-
-// Sqlite3Dialect struct.
-type Sqlite3Dialect struct{}
-
-func (m Sqlite3Dialect) createVersionTableSQL() string {
-	return fmt.Sprintf(`CREATE TABLE %s (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                version_id INTEGER NOT NULL,
-                is_applied INTEGER NOT NULL,
-                tstamp TIMESTAMP DEFAULT (datetime('now'))
-            );`, TableName())
-}
-
-func (m Sqlite3Dialect) insertVersionSQL() string {
-	return fmt.Sprintf("INSERT INTO %s (version_id, is_applied) VALUES (?, ?);", TableName())
-}
-
-func (m Sqlite3Dialect) dbVersionQuery(db *sql.DB) (*sql.Rows, error) {
-	rows, err := db.Query(fmt.Sprintf("SELECT version_id, is_applied from %s ORDER BY id DESC", TableName()))
-	if err != nil {
-		return nil, err
-	}
-
-	return rows, err
-}
-
-func (m Sqlite3Dialect) migrationSQL() string {
-	return fmt.Sprintf("SELECT tstamp, is_applied FROM %s WHERE version_id=? ORDER BY tstamp DESC LIMIT 1", TableName())
-}
-
-func (m Sqlite3Dialect) deleteVersionSQL() string {
-	return fmt.Sprintf("DELETE FROM %s WHERE version_id=?;", TableName())
-}
-
-func (m Sqlite3Dialect) lock(db *sql.Tx) error {
-	return nil
-}
-
-func (m Sqlite3Dialect) unlock(db *sql.Tx) error {
-	return nil
-}
-
-////////////////////////////
-// Redshift
-////////////////////////////
-
-// RedshiftDialect struct.
-type RedshiftDialect struct{}
-
-func (rs RedshiftDialect) createVersionTableSQL() string {
-	return fmt.Sprintf(`CREATE TABLE %s (
-            	id integer NOT NULL identity(1, 1),
-                version_id bigint NOT NULL,
-                is_applied boolean NOT NULL,
-                tstamp timestamp NULL default sysdate,
-                PRIMARY KEY(id)
-            );`, TableName())
-}
-
-func (rs RedshiftDialect) insertVersionSQL() string {
-	return fmt.Sprintf("INSERT INTO %s (version_id, is_applied) VALUES ($1, $2);", TableName())
-}
-
-func (rs RedshiftDialect) dbVersionQuery(db *sql.DB) (*sql.Rows, error) {
-	rows, err := db.Query(fmt.Sprintf("SELECT version_id, is_applied from %s ORDER BY id DESC", TableName()))
-	if err != nil {
-		return nil, err
-	}
-
-	return rows, err
-}
-
-func (m RedshiftDialect) migrationSQL() string {
-	return fmt.Sprintf("SELECT tstamp, is_applied FROM %s WHERE version_id=$1 ORDER BY tstamp DESC LIMIT 1", TableName())
-}
-
-func (rs RedshiftDialect) deleteVersionSQL() string {
-	return fmt.Sprintf("DELETE FROM %s WHERE version_id=$1;", TableName())
-}
-
-func (rs RedshiftDialect) lock(db *sql.Tx) error {
-	return nil
-}
-
-func (rs RedshiftDialect) unlock(db *sql.Tx) error {
-	return nil
-}
-
-////////////////////////////
 // TiDB
 ////////////////////////////
 
@@ -483,51 +268,5 @@ func (m TiDBDialect) unlock(db *sql.Tx) error {
 	if _, err := db.ExecContext(context.Background(), query, aid); err != nil {
 		return fmt.Errorf("try unlock failed, err: %s", err.Error())
 	}
-	return nil
-}
-
-////////////////////////////
-// ClickHouse
-////////////////////////////
-
-// ClickHouseDialect struct.
-type ClickHouseDialect struct{}
-
-func (m ClickHouseDialect) createVersionTableSQL() string {
-	return `
-    CREATE TABLE goose_db_version (
-      version_id Int64,
-      is_applied UInt8,
-      date Date default now(),
-      tstamp DateTime default now()
-    ) Engine = MergeTree(date, (date), 8192)
-	`
-}
-
-func (m ClickHouseDialect) dbVersionQuery(db *sql.DB) (*sql.Rows, error) {
-	rows, err := db.Query(fmt.Sprintf("SELECT version_id, is_applied FROM %s ORDER BY tstamp DESC LIMIT 1", TableName()))
-	if err != nil {
-		return nil, err
-	}
-	return rows, err
-}
-
-func (m ClickHouseDialect) insertVersionSQL() string {
-	return fmt.Sprintf("INSERT INTO %s (version_id, is_applied) VALUES (?, ?)", TableName())
-}
-
-func (m ClickHouseDialect) migrationSQL() string {
-	return fmt.Sprintf("SELECT tstamp, is_applied FROM %s WHERE version_id = ? ORDER BY tstamp DESC LIMIT 1", TableName())
-}
-
-func (m ClickHouseDialect) deleteVersionSQL() string {
-	return fmt.Sprintf("ALTER TABLE %s DELETE WHERE version_id = ?", TableName())
-}
-
-func (m ClickHouseDialect) lock(db *sql.Tx) error {
-	return nil
-}
-
-func (m ClickHouseDialect) unlock(db *sql.Tx) error {
 	return nil
 }
