@@ -75,7 +75,6 @@ func parseSQLMigration(r io.Reader, direction bool) (stmts []string, useTx bool,
 			verboseInfo("StateMachine: ignore empty line")
 			continue
 		}
-
 		if strings.HasPrefix(line, "--") {
 			cmd := strings.TrimSpace(strings.TrimPrefix(line, "--"))
 
@@ -128,11 +127,11 @@ func parseSQLMigration(r io.Reader, direction bool) (stmts []string, useTx bool,
 				verboseInfo("StateMachine: ignore comment")
 				continue
 			}
-		} else {
-			// Write SQL line to a buffer.
-			if _, err := buf.WriteString(line + "\n"); err != nil {
-				return nil, false, errors.Wrap(err, "failed to write to buf")
-			}
+		}
+
+		// Write SQL line to a buffer.
+		if _, err := buf.WriteString(line + "\n"); err != nil {
+			return nil, false, errors.Wrap(err, "failed to write to buf")
 		}
 
 		// Read SQL body one by line, if we're in the right direction.
@@ -158,29 +157,25 @@ func parseSQLMigration(r io.Reader, direction bool) (stmts []string, useTx bool,
 		}
 
 		switch stateMachine.Get() {
-		case gooseUp, gooseStatementBeginUp:
+		case gooseUp:
 			if endsWithSemicolon(line) {
 				stmts = append(stmts, buf.String())
 				buf.Reset()
 				verboseInfo("StateMachine: store simple Up query")
 			}
-		case gooseDown, gooseStatementBeginDown:
+		case gooseDown:
 			if endsWithSemicolon(line) {
 				stmts = append(stmts, buf.String())
 				buf.Reset()
 				verboseInfo("StateMachine: store simple Down query")
 			}
 		case gooseStatementEndUp:
-			if buf.Len() > 0 {
-				stmts = append(stmts, buf.String())
-			}
+			stmts = append(stmts, buf.String())
 			buf.Reset()
 			verboseInfo("StateMachine: store Up statement")
 			stateMachine.Set(gooseUp)
 		case gooseStatementEndDown:
-			if buf.Len() > 0 {
-				stmts = append(stmts, buf.String())
-			}
+			stmts = append(stmts, buf.String())
 			buf.Reset()
 			verboseInfo("StateMachine: store Down statement")
 			stateMachine.Set(gooseDown)
