@@ -15,8 +15,6 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
-	_ "github.com/ziutek/mymysql/godrv"
 )
 
 var (
@@ -48,25 +46,24 @@ func newMigration(v int64, src string) *Migration {
 	return &Migration{v, -1, -1, src}
 }
 
-func RunMigrations(conf *DBConf, migrationsDir string, target int64) (err error) {
-
+func RunMigrations(conf *DBConf, target int64) (err error) {
 	db, err := OpenDBFromDBConf(conf)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	return RunMigrationsOnDb(conf, migrationsDir, target, db)
+	return RunMigrationsOnDb(conf, db, target)
 }
 
 // Runs migration on a specific database instance.
-func RunMigrationsOnDb(conf *DBConf, migrationsDir string, target int64, db *sql.DB) (err error) {
+func RunMigrationsOnDb(conf *DBConf, db *sql.DB, target int64) (err error) {
 	current, err := EnsureDBVersion(conf, db)
 	if err != nil {
 		return err
 	}
 
-	migrations, err := CollectMigrations(migrationsDir, current, target)
+	migrations, err := CollectMigrations(conf.MigrationsDir, current, target)
 	if err != nil {
 		return err
 	}
@@ -80,8 +77,7 @@ func RunMigrationsOnDb(conf *DBConf, migrationsDir string, target int64, db *sql
 	direction := current < target
 	ms.Sort(direction)
 
-	fmt.Printf("goose: migrating db environment '%v', current version: %d, target: %d\n",
-		conf.Env, current, target)
+	fmt.Printf("goose: migrating db using table %s, current version: %d, target: %d\n", conf.Table, current, target)
 
 	for _, m := range ms {
 
@@ -100,6 +96,22 @@ func RunMigrationsOnDb(conf *DBConf, migrationsDir string, target int64, db *sql
 	}
 
 	return nil
+}
+
+func RunMigrationOnDb(conf *DBConf, db *sql.DB, m *Migration, direction bool) (err error) {
+	switch filepath.Ext(m.Source) {
+	case ".go":
+		err = runGoMigration(conf, m.Source, m.Version, direction)
+	case ".sql":
+		err = runSQLMigration(conf, db, m.Source, m.Version, direction)
+	}
+
+	if err != nil {
+		return errors.New(fmt.Sprintf("FAIL %v, quiting migration", err))
+	}
+
+	fmt.Println("OK   ", filepath.Base(m.Source))
+	return
 }
 
 // collect all the valid looking migration scripts in the
@@ -166,7 +178,9 @@ func (ms migrationSorter) Sort(direction bool) {
 }
 
 // look for migration scripts with names in the form:
-//  XXX_descriptivename.ext
+//
+//	XXX_descriptivename.ext
+//
 // where XXX specifies the version number
 // and ext specifies the type of migration
 func NumericComponent(name string) (int64, error) {
@@ -347,6 +361,46 @@ func GetMostRecentDBVersion(dirpath string) (version int64, err error) {
 	return
 }
 
+func VersionExist(dirpath string, versions []string) (map[int64]*Migration, error) {
+	mapversions := make(map[int64]*Migration)
+	for _, version := range versions {
+		v, err := strconv.ParseInt(version, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		mapversions[v] = nil
+	}
+	err := filepath.Walk(dirpath, func(name string, info os.FileInfo, walkerr error) error {
+		if walkerr != nil {
+			return walkerr
+		}
+
+		if !info.IsDir() {
+			v, e := NumericComponent(name)
+			if e != nil {
+				return e
+			}
+			if _, exists := mapversions[v]; exists {
+				mapversions[v] = newMigration(v, name)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	for v, f := range mapversions {
+		if f == nil {
+			return nil, fmt.Errorf("%d can not find match migration file", v)
+		}
+	}
+
+	return mapversions, nil
+}
+
 func CreateMigration(name, migrationType, dir string, t time.Time) (path string, err error) {
 
 	if migrationType != "go" && migrationType != "sql" {
@@ -405,9 +459,13 @@ func Down_{{ . }}(txn *sql.Tx) {
 var sqlMigrationTemplate = template.Must(template.New("goose.sql-migration").Parse(`
 -- +goose Up
 -- SQL in section 'Up' is executed when this migration is applied
-
+-- +goose StatementBegin
+-- code block
+-- +goose StatementEnd
 
 -- +goose Down
 -- SQL section 'Down' is executed when this migration is rolled back
-
+-- +goose StatementBegin
+-- code block
+-- +goose StatementEnd
 `))

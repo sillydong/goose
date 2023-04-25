@@ -1,8 +1,9 @@
 package main
 
 import (
-	"bitbucket.org/liamstask/goose/lib/goose"
 	"log"
+
+	"github.com/sillydong/goose/lib/goose"
 )
 
 var redoCmd = &Command{
@@ -29,11 +30,11 @@ func redoRun(cmd *Command, args ...string) {
 		log.Fatal(err)
 	}
 
-	if err := goose.RunMigrations(conf, conf.MigrationsDir, previous); err != nil {
+	if err := goose.RunMigrations(conf, previous); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := goose.RunMigrations(conf, conf.MigrationsDir, current); err != nil {
+	if err := goose.RunMigrations(conf, current); err != nil {
 		log.Fatal(err)
 	}
 }

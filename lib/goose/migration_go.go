@@ -24,16 +24,13 @@ type templateData struct {
 func init() {
 	gob.Register(PostgresDialect{})
 	gob.Register(MySqlDialect{})
-	gob.Register(Sqlite3Dialect{})
 }
 
-//
 // Run a .go migration.
 //
 // In order to do this, we copy a modified version of the
 // original .go migration, and execute it via `go run` along
 // with a main() of our own creation.
-//
 func runGoMigration(conf *DBConf, path string, version int64, direction bool) error {
 
 	// everything gets written to a temp dir, and zapped afterwards
@@ -82,6 +79,8 @@ func runGoMigration(conf *DBConf, path string, version int64, direction bool) er
 	}
 
 	cmd := exec.Command("go", "run", main, outpath)
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "GO111MODULE=off") // disable GO111MODULE
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if e = cmd.Run(); e != nil {
@@ -91,11 +90,9 @@ func runGoMigration(conf *DBConf, path string, version int64, direction bool) er
 	return nil
 }
 
-//
 // template for the main entry point to a go-based migration.
 // this gets linked against the substituted versions of the user-supplied
 // scripts in order to execute a migration via `go run`
-//
 var goMigrationDriverTemplate = template.Must(template.New("goose.go-driver").Parse(`
 package main
 
@@ -105,7 +102,7 @@ import (
 	"encoding/gob"
 
 	_ "{{.Import}}"
-	"bitbucket.org/liamstask/goose/lib/goose"
+	"github.com/sillydong/goose/lib/goose"
 )
 
 func main() {

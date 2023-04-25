@@ -4,15 +4,15 @@ goose is a database migration tool.
 
 You can manage your database's evolution by creating incremental SQL or Go scripts.
 
-[![Build Status](https://drone.io/bitbucket.org/liamstask/goose/status.png)](https://drone.io/bitbucket.org/liamstask/goose/latest)
+[![Build Status](https://drone.io/github.com/sillydong/goose/status.png)](https://drone.io/github.com/sillydong/goose/latest)
 
 # Install
 
-    $ go get bitbucket.org/liamstask/goose/cmd/goose
+    $ go get github.com/sillydong/goose/cmd/goose
 
 This will install the `goose` binary to your `$GOPATH/bin` directory.
 
-You can also build goose into your own applications by importing `bitbucket.org/liamstask/goose/lib/goose`. Documentation is available at [godoc.org](http://godoc.org/bitbucket.org/liamstask/goose/lib/goose).
+You can also build goose into your own applications by importing `github.com/sillydong/goose/lib/goose`. Documentation is available at [godoc.org](http://godoc.org/github.com/sillydong/goose/lib/goose).
 
 NOTE: the API is still new, and may undergo some changes.
 
@@ -202,7 +202,7 @@ goose will expand environment variables in the `open` element. For an example, s
 ## Other Drivers
 goose knows about some common SQL drivers, but it can still be used to run Go-based migrations with any driver supported by `database/sql`. An import path and known dialect are required.
 
-Currently, available dialects are: "postgres", "mysql", or "sqlite3"
+Currently, available dialects are: "postgres" and "mysql"
 
 To run Go-based migrations with another driver, specify its import path and dialect, as shown below.
 
@@ -227,7 +227,7 @@ These instructions assume that you're using [Keith Rarick's Heroku Go buildpack]
 // note: need at least one blank line after build constraint
 package main
 
-import _ "bitbucket.org/liamstask/goose/cmd/goose"
+import _ "github.com/sillydong/goose/cmd/goose"
 ```
 
 [Set up your Heroku database(s) as usual.](https://devcenter.heroku.com/articles/heroku-postgresql)

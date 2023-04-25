@@ -1,12 +1,13 @@
 package main
 
 import (
-	"bitbucket.org/liamstask/goose/lib/goose"
 	"database/sql"
 	"fmt"
 	"log"
 	"path/filepath"
 	"time"
+
+	"github.com/sillydong/goose/lib/goose"
 )
 
 var statusCmd = &Command{
@@ -48,17 +49,17 @@ func statusRun(cmd *Command, args ...string) {
 		log.Fatal(e)
 	}
 
-	fmt.Printf("goose: status for environment '%v'\n", conf.Env)
+	fmt.Println("goose: status")
 	fmt.Println("    Applied At                  Migration")
 	fmt.Println("    =======================================")
 	for _, m := range migrations {
-		printMigrationStatus(db, m.Version, filepath.Base(m.Source))
+		printMigrationStatus(db, conf.Table, m.Version, filepath.Base(m.Source))
 	}
 }
 
-func printMigrationStatus(db *sql.DB, version int64, script string) {
+func printMigrationStatus(db *sql.DB, table string, version int64, script string) {
 	var row goose.MigrationRecord
-	q := fmt.Sprintf("SELECT tstamp, is_applied FROM goose_db_version WHERE version_id=%d ORDER BY tstamp DESC LIMIT 1", version)
+	q := fmt.Sprintf("SELECT tstamp, is_applied FROM "+table+" WHERE version_id=%d ORDER BY tstamp DESC LIMIT 1", version)
 	e := db.QueryRow(q).Scan(&row.TStamp, &row.IsApplied)
 
 	if e != nil && e != sql.ErrNoRows {

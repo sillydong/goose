@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"github.com/kylelemons/go-gypsy/yaml"
 	"github.com/lib/pq"
 )
 
@@ -22,62 +20,48 @@ type DBDriver struct {
 
 type DBConf struct {
 	MigrationsDir string
-	Env           string
 	Driver        DBDriver
+	Table         string
 	PgSchema      string
 }
 
 // extract configuration details from the given file
-func NewDBConf(p, env string, pgschema string) (*DBConf, error) {
-
-	cfgFile := filepath.Join(p, "dbconf.yml")
-
-	f, err := yaml.ReadFile(cfgFile)
+func NewDBConf(p, table, pgschema string) (*DBConf, error) {
+	f, err := os.Stat(p)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Fail open directory %s: %v", p, err)
+	}
+	if !f.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", p)
 	}
 
-	drv, err := f.Get(fmt.Sprintf("%s.driver", env))
-	if err != nil {
-		return nil, err
+	drv := os.Getenv("GOOSE_DRIVER")
+	open := os.Getenv("GOOSE_DBSTRING")
+	if drv == "" || open == "" {
+		return nil, fmt.Errorf("Please provide environment variables GOOSE_DRIVER and GOOSE_DBSTRING to run this application")
 	}
-	drv = os.ExpandEnv(drv)
-
-	open, err := f.Get(fmt.Sprintf("%s.open", env))
-	if err != nil {
-		return nil, err
+	if pgschema == "" {
+		pgschema = os.Getenv("GOOSE_PGSCHEMA")
 	}
-	open = os.ExpandEnv(open)
 
 	// Automatically parse postgres urls
 	if drv == "postgres" {
-
 		// Assumption: If we can parse the URL, we should
 		if parsedURL, err := pq.ParseURL(open); err == nil && parsedURL != "" {
 			open = parsedURL
 		}
 	}
 
-	d := newDBDriver(drv, open)
-
-	// allow the configuration to override the Import for this driver
-	if imprt, err := f.Get(fmt.Sprintf("%s.import", env)); err == nil {
-		d.Import = imprt
-	}
-
-	// allow the configuration to override the Dialect for this driver
-	if dialect, err := f.Get(fmt.Sprintf("%s.dialect", env)); err == nil {
-		d.Dialect = dialectByName(dialect)
-	}
+	d := newDBDriver(drv, open, table)
 
 	if !d.IsValid() {
 		return nil, errors.New(fmt.Sprintf("Invalid DBConf: %v", d))
 	}
 
 	return &DBConf{
-		MigrationsDir: filepath.Join(p, "migrations"),
-		Env:           env,
+		MigrationsDir: p,
 		Driver:        d,
+		Table:         table,
 		PgSchema:      pgschema,
 	}, nil
 }
@@ -85,7 +69,7 @@ func NewDBConf(p, env string, pgschema string) (*DBConf, error) {
 // Create a new DBDriver and populate driver specific
 // fields for drivers that we know about.
 // Further customization may be done in NewDBConf
-func newDBDriver(name, open string) DBDriver {
+func newDBDriver(name, open, table string) DBDriver {
 
 	d := DBDriver{
 		Name:    name,
@@ -95,19 +79,15 @@ func newDBDriver(name, open string) DBDriver {
 	switch name {
 	case "postgres":
 		d.Import = "github.com/lib/pq"
-		d.Dialect = &PostgresDialect{}
-
-	case "mymysql":
-		d.Import = "github.com/ziutek/mymysql/godrv"
-		d.Dialect = &MySqlDialect{}
+		d.Dialect = &PostgresDialect{
+			Table: table,
+		}
 
 	case "mysql":
 		d.Import = "github.com/go-sql-driver/mysql"
-		d.Dialect = &MySqlDialect{}
-
-	case "sqlite3":
-		d.Import = "github.com/mattn/go-sqlite3"
-		d.Dialect = &Sqlite3Dialect{}
+		d.Dialect = &MySqlDialect{
+			Table: table,
+		}
 	}
 
 	return d
