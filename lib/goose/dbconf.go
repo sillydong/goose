@@ -110,6 +110,9 @@ func OpenDBFromDBConf(conf *DBConf) (*sql.DB, error) {
 
 	// if a postgres schema has been specified, apply it
 	if conf.Driver.Name == "postgres" && conf.PgSchema != "" {
+		if _, err := db.Exec("CREATE SCHEMA IF NOT EXISTS " + conf.PgSchema); err != nil {
+			return nil, err
+		}
 		if _, err := db.Exec("SET search_path TO " + conf.PgSchema); err != nil {
 			return nil, err
 		}
